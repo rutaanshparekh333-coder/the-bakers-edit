@@ -18,9 +18,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "The Baker's Edit | Mumbai's curated home bakers",
+  title: "The Baker's Edit | Discover Mumbai's finest home bakers",
   description:
-    "Discover premium home bakers, handcrafted cakes and unforgettable desserts across Mumbai.",
+    "A curated discovery platform for premium home bakers, handcrafted cakes and unforgettable desserts in Mumbai.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#f7f1e8] text-[#2b2118]">
+      <body className="min-h-full flex flex-col bg-[#f6f1e8] text-[#2b2118]">
         {children}
       </body>
     </html>
