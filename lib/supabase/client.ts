@@ -1,13 +1,14 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 
-let supabaseInstance: SupabaseClient | null = null;
+let supabaseInstance: SupabaseClient<Database> | null = null;
 
 /**
- * Resilient Supabase browser client.
+ * Resilient Supabase browser client, typed against the Database schema.
  * Does not expose service role secrets.
  * Safely initializes using public environment variables.
  */
-export function getSupabaseClient(): SupabaseClient | null {
+export function getSupabaseClient(): SupabaseClient<Database> | null {
   if (supabaseInstance) {
     return supabaseInstance;
   }
@@ -22,7 +23,7 @@ export function getSupabaseClient(): SupabaseClient | null {
   }
 
   try {
-    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseKey, {
       auth: {
         persistSession: false,
       },

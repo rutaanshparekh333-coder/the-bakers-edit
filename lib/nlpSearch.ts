@@ -59,15 +59,37 @@ const DIETARY_MAP: Record<string, string[]> = {
 };
 
 /**
+ * Safe string getter that returns a string, avoiding TypeError on null/undefined.
+ */
+export function safeString(val: unknown): string {
+  return val == null ? "" : String(val);
+}
+
+/**
+ * Safe string normalization helper that guarantees a trimmed lowercase string,
+ * avoiding TypeError on null/undefined.
+ */
+export function safeLower(val: unknown): string {
+  return safeString(val).toLowerCase();
+}
+
+/**
+ * Safe array helper that ensures the returned value is always an array.
+ */
+export function safeArray<T>(arr: unknown): T[] {
+  return Array.isArray(arr) ? arr : [];
+}
+
+/**
  * Natural Language Search Parser for The Baker's Edit.
  * Analyzes unstructured freeform text like:
  * "Find me a premium chocolate cake baker in Bandra under ₹2000"
  * and extracts intent, location, budget constraints, dessert types, and dietary preferences.
  */
 export function parseNaturalLanguageQuery(query: string): NlpParsedQuery {
-  const clean = query.trim().toLowerCase();
+  const clean = safeLower(query).trim();
   const parsed: NlpParsedQuery = {
-    rawQuery: query,
+    rawQuery: safeString(query),
     dietaryPreferences: [],
     keywords: [],
     confidence: 0,
@@ -85,7 +107,7 @@ export function parseNaturalLanguageQuery(query: string): NlpParsedQuery {
   );
   if (underMatch) {
     let amount = parseInt(underMatch[1], 10);
-    if (underMatch[2]?.toLowerCase() === "k") {
+    if (safeLower(underMatch[2]) === "k") {
       amount *= 1000;
     }
     parsed.maxBudget = amount;
@@ -111,7 +133,7 @@ export function parseNaturalLanguageQuery(query: string): NlpParsedQuery {
 
   // 2. Extract Location
   for (const loc of MUMBAI_LOCATIONS) {
-    if (loc.matchers.some((m) => clean.includes(m))) {
+    if (safeArray(loc.matchers).some((m) => clean.includes(safeLower(m)))) {
       parsed.location = loc.name;
       matchedAspects++;
       break;
@@ -120,7 +142,7 @@ export function parseNaturalLanguageQuery(query: string): NlpParsedQuery {
 
   // 3. Extract Dessert / Category
   for (const [, val] of Object.entries(CATEGORY_MAP)) {
-    if (val.aliases.some((alias) => clean.includes(alias))) {
+    if (safeArray(val.aliases).some((alias) => clean.includes(safeLower(alias)))) {
       parsed.category = val.category;
       parsed.dessertType = val.category;
       matchedAspects++;
@@ -137,7 +159,7 @@ export function parseNaturalLanguageQuery(query: string): NlpParsedQuery {
 
   // 4. Extract Dietary Preferences
   for (const [diet, terms] of Object.entries(DIETARY_MAP)) {
-    if (terms.some((term) => clean.includes(term))) {
+    if (safeArray(terms).some((term) => clean.includes(safeLower(term)))) {
       parsed.dietaryPreferences.push(diet);
       matchedAspects++;
     }
@@ -169,33 +191,60 @@ export function filterBakers(
   bakers: Baker[],
   filters: FilterState
 ): { filtered: Baker[]; nlpParsed: NlpParsedQuery | null } {
-  const query = filters.searchQuery.trim();
+  if (!Array.isArray(bakers)) {
+    return { filtered: [], nlpParsed: null };
+  }
+
+  const query = safeString(filters?.searchQuery).trim();
   const nlp = query.length > 3 ? parseNaturalLanguageQuery(query) : null;
 
   const filtered = bakers.filter((baker) => {
+    if (!baker) return false;
+
+    const bakerArea = safeLower(baker.area);
+    const bakerLocation = safeLower(baker.location);
+    const bakerSpecialties = safeLower(baker.specialties);
+    const bakerName = safeLower(baker.name);
+    const bakerBio = safeLower(baker.shortDescription || baker.bio);
+    const specialtyTags = safeArray<string>(baker.specialtyTags);
+    const signatureDesserts = safeArray<any>(baker.signatureDesserts);
+    const dietaryOptions = safeArray<string>(baker.dietaryOptions);
+    const priceMin = Number(baker.priceMin ?? 0);
+    const priceMax = Number(baker.priceMax ?? 10000);
+
     // 1. NLP / Text Match
     if (query) {
       if (nlp && nlp.confidence >= 0.5) {
         // NLP Location check
-        if (nlp.location && !baker.area.toLowerCase().includes(nlp.location.toLowerCase())) {
-          return false;
+        if (nlp.location) {
+          const locLower = safeLower(nlp.location);
+          const matchesLocation =
+            bakerArea.includes(locLower) ||
+            bakerLocation.includes(locLower) ||
+            (bakerArea && locLower.includes(bakerArea));
+          if (!matchesLocation) {
+            return false;
+          }
         }
 
         // NLP Budget check
-        if (nlp.maxBudget && baker.priceMin > nlp.maxBudget) {
+        if (nlp.maxBudget && priceMin > nlp.maxBudget) {
           return false;
         }
-        if (nlp.minBudget && baker.priceMax < nlp.minBudget) {
+        if (nlp.minBudget && priceMax < nlp.minBudget) {
           return false;
         }
 
         // NLP Category check
         if (nlp.category) {
-          const catLower = nlp.category.toLowerCase();
-          const matchesSpecialties = baker.specialties.toLowerCase().includes(catLower);
-          const matchesTags = baker.specialtyTags.some((t) => t.toLowerCase().includes(catLower));
-          const matchesDesserts = baker.signatureDesserts.some((d) =>
-            d.category.toLowerCase().includes(catLower) || d.name.toLowerCase().includes(catLower)
+          const catLower = safeLower(nlp.category);
+          const matchesSpecialties = bakerSpecialties.includes(catLower);
+          const matchesTags = specialtyTags.some((t) =>
+            safeLower(t).includes(catLower)
+          );
+          const matchesDesserts = signatureDesserts.some((d) =>
+            safeLower(d?.category).includes(catLower) ||
+            safeLower(d?.name).includes(catLower)
           );
           if (!matchesSpecialties && !matchesTags && !matchesDesserts) {
             return false;
@@ -203,18 +252,22 @@ export function filterBakers(
         }
 
         // NLP Dietary check
-        if (nlp.dietaryPreferences.length > 0) {
+        if (safeArray(nlp.dietaryPreferences).length > 0) {
           const hasDiet = nlp.dietaryPreferences.every((pref) => {
-            if (pref === "eggless") {
-              return baker.dietaryOptions.some((o) => o.toLowerCase().includes("eggless"));
+            const pLower = safeLower(pref);
+            if (pLower === "eggless") {
+              return dietaryOptions.some((o) => safeLower(o).includes("eggless"));
             }
-            if (pref === "vegan") {
+            if (pLower === "vegan") {
               return (
-                baker.dietaryOptions.some((o) => o.toLowerCase().includes("vegan")) ||
-                baker.signatureDesserts.some((d) => d.isVegan)
+                dietaryOptions.some((o) => safeLower(o).includes("vegan")) ||
+                signatureDesserts.some((d) => Boolean(d?.isVegan))
               );
             }
-            return true;
+            if (pLower === "gluten-free" || pLower === "gf") {
+              return dietaryOptions.some((o) => safeLower(o).includes("gluten"));
+            }
+            return dietaryOptions.some((o) => safeLower(o).includes(pLower));
           });
           if (!hasDiet) {
             return false;
@@ -222,74 +275,90 @@ export function filterBakers(
         }
       } else {
         // Fallback to literal keyword search
-        const qLower = query.toLowerCase();
-        const matchesName = baker.name.toLowerCase().includes(qLower);
-        const matchesLoc = baker.location.toLowerCase().includes(qLower);
-        const matchesSpec = baker.specialties.toLowerCase().includes(qLower);
-        const matchesBio = baker.shortDescription.toLowerCase().includes(qLower);
-        const matchesDessert = baker.signatureDesserts.some(
-          (d) => d.name.toLowerCase().includes(qLower) || d.category.toLowerCase().includes(qLower)
+        const qLower = safeLower(query);
+        const matchesName = bakerName.includes(qLower);
+        const matchesLoc = bakerLocation.includes(qLower) || bakerArea.includes(qLower);
+        const matchesSpec = bakerSpecialties.includes(qLower);
+        const matchesBio = bakerBio.includes(qLower);
+        const matchesTags = specialtyTags.some((t) => safeLower(t).includes(qLower));
+        const matchesDessert = signatureDesserts.some(
+          (d) =>
+            safeLower(d?.name).includes(qLower) ||
+            safeLower(d?.category).includes(qLower) ||
+            safeLower(d?.description).includes(qLower)
         );
 
-        if (!matchesName && !matchesLoc && !matchesSpec && !matchesBio && !matchesDessert) {
+        if (!matchesName && !matchesLoc && !matchesSpec && !matchesBio && !matchesTags && !matchesDessert) {
           return false;
         }
       }
     }
 
     // 2. Explicit Category filter
-    if (filters.selectedCategory && filters.selectedCategory !== "all") {
-      const catLower = filters.selectedCategory.toLowerCase();
+    if (filters?.selectedCategory && filters.selectedCategory !== "all") {
+      const catLower = safeLower(filters.selectedCategory);
       const hasCategory =
-        baker.specialties.toLowerCase().includes(catLower) ||
-        baker.specialtyTags.some((t) => t.toLowerCase().includes(catLower)) ||
-        baker.signatureDesserts.some((d) => d.category.toLowerCase().includes(catLower));
+        bakerSpecialties.includes(catLower) ||
+        specialtyTags.some((t) => safeLower(t).includes(catLower)) ||
+        signatureDesserts.some((d) =>
+          safeLower(d?.category).includes(catLower) ||
+          safeLower(d?.name).includes(catLower)
+        );
       if (!hasCategory) return false;
     }
 
     // 3. Explicit Area filter
-    if (filters.selectedArea && filters.selectedArea !== "All Areas" && filters.selectedArea !== "all") {
-      const areaLower = filters.selectedArea.toLowerCase();
-      if (!baker.area.toLowerCase().includes(areaLower) && !baker.location.toLowerCase().includes(areaLower)) {
+    if (
+      filters?.selectedArea &&
+      filters.selectedArea !== "All Areas" &&
+      filters.selectedArea !== "all"
+    ) {
+      const areaLower = safeLower(filters.selectedArea);
+      const matchesArea =
+        (bakerArea && (bakerArea.includes(areaLower) || areaLower.includes(bakerArea))) ||
+        (bakerLocation && (bakerLocation.includes(areaLower) || areaLower.includes(bakerLocation)));
+      if (!matchesArea) {
         return false;
       }
     }
 
     // 4. Explicit Price Range filter
-    if (filters.priceRange && filters.priceRange !== "all") {
+    if (filters?.priceRange && filters.priceRange !== "all") {
       switch (filters.priceRange) {
         case "under-1000":
-          if (baker.priceMin > 1000) return false;
+          if (priceMin > 1000) return false;
           break;
         case "1000-2500":
-          if (baker.priceMax < 1000 || baker.priceMin > 2500) return false;
+          if (priceMax < 1000 || priceMin > 2500) return false;
           break;
         case "2500-5000":
-          if (baker.priceMax < 2500 || baker.priceMin > 5000) return false;
+          if (priceMax < 2500 || priceMin > 5000) return false;
           break;
         case "above-5000":
-          if (baker.priceMax < 5000) return false;
+          if (priceMax < 5000) return false;
           break;
       }
     }
 
     // 5. Explicit Rating filter
-    if (filters.minRating && filters.minRating > 0) {
-      if (baker.rating < filters.minRating) return false;
+    if (filters?.minRating && filters.minRating > 0) {
+      const bakerRating = Number(baker.rating ?? 0);
+      if (bakerRating < filters.minRating) return false;
     }
 
     // 6. Explicit Dietary filter
-    if (filters.dietary && filters.dietary !== "all") {
-      if (filters.dietary === "eggless") {
-        const isEggless = baker.dietaryOptions.some((d) => d.toLowerCase().includes("eggless"));
+    if (filters?.dietary && filters.dietary !== "all") {
+      const dietFilter = safeLower(filters.dietary);
+      if (dietFilter === "eggless") {
+        const isEggless = dietaryOptions.some((d) => safeLower(d).includes("eggless"));
         if (!isEggless) return false;
-      } else if (filters.dietary === "vegan") {
+      } else if (dietFilter === "vegan") {
         const isVegan =
-          baker.dietaryOptions.some((d) => d.toLowerCase().includes("vegan")) ||
-          baker.signatureDesserts.some((d) => d.isVegan);
+          dietaryOptions.some((d) => safeLower(d).includes("vegan")) ||
+          signatureDesserts.some((d) => Boolean(d?.isVegan));
         if (!isVegan) return false;
-      } else if (filters.dietary === "gluten-free") {
-        const isGf = baker.dietaryOptions.some((d) => d.toLowerCase().includes("gluten"));
+      } else if (dietFilter === "gluten-free") {
+        const isGf = dietaryOptions.some((d) => safeLower(d).includes("gluten"));
         if (!isGf) return false;
       }
     }
@@ -299,15 +368,15 @@ export function filterBakers(
 
   // Sorting
   const sorted = [...filtered].sort((a, b) => {
-    switch (filters.sortBy) {
+    switch (filters?.sortBy) {
       case "rating":
-        return b.rating - a.rating;
+        return Number(b.rating ?? 0) - Number(a.rating ?? 0);
       case "reviews":
-        return b.reviewCount - a.reviewCount;
+        return Number(b.reviewCount ?? 0) - Number(a.reviewCount ?? 0);
       case "price-asc":
-        return a.priceMin - b.priceMin;
+        return Number(a.priceMin ?? 0) - Number(b.priceMin ?? 0);
       case "price-desc":
-        return b.priceMax - a.priceMax;
+        return Number(b.priceMax ?? 0) - Number(a.priceMax ?? 0);
       default:
         return 0; // featured original order
     }

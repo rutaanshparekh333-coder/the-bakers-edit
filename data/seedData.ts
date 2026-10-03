@@ -80,7 +80,7 @@ export const categories: Category[] = [
     name: "Dessert Boxes",
     slug: "dessert-boxes",
     image:
-      "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1603532648955-039310d9ed75?auto=format&fit=crop&w=900&q=80",
     description: "Luxury gifting hampers featuring curated dessert tasting assortments.",
     itemCount: 27,
   },

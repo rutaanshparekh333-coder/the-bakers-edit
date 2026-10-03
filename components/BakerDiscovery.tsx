@@ -30,9 +30,8 @@ export function BakerDiscovery({
   onFiltersChange,
   onSelectBaker,
 }: BakerDiscoveryProps) {
-  // Compute filtered bakers and any NLP extracted entities
   const { filtered, nlpParsed } = useMemo(() => {
-    return filterBakers(allBakers, filters);
+    return filterBakers(allBakers || [], filters);
   }, [allBakers, filters]);
 
   function handleSearchChange(val: string) {
@@ -45,7 +44,8 @@ export function BakerDiscovery({
   function handleCategoryChange(categoryName: string) {
     onFiltersChange({
       ...filters,
-      selectedCategory: categoryName === filters.selectedCategory ? "all" : categoryName,
+      selectedCategory:
+        categoryName === filters.selectedCategory ? "all" : categoryName,
     });
   }
 
@@ -99,40 +99,57 @@ export function BakerDiscovery({
   }
 
   const hasActiveFilters =
-    filters.searchQuery !== "" ||
-    filters.selectedCategory !== "all" ||
-    (filters.selectedArea !== "all" && filters.selectedArea !== "All Areas") ||
-    filters.priceRange !== "all" ||
-    filters.minRating > 0 ||
-    filters.dietary !== "all";
+    Boolean(filters?.searchQuery) ||
+    (Boolean(filters?.selectedCategory) && filters.selectedCategory !== "all") ||
+    (Boolean(filters?.selectedArea) &&
+      filters.selectedArea !== "all" &&
+      filters.selectedArea !== "All Areas") ||
+    (Boolean(filters?.priceRange) && filters.priceRange !== "all") ||
+    Number(filters?.minRating ?? 0) > 0 ||
+    (Boolean(filters?.dietary) && filters.dietary !== "all");
 
   return (
-    <section id="bakers" className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24">
+    <section
+      id="bakers"
+      className="max-w-7xl mx-auto px-5 sm:px-8 py-16 sm:py-24"
+    >
       {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
         <div>
-          <p className="text-[11px] sm:text-xs uppercase tracking-[0.26em] text-[#2b2118]/45">
-            Artisanal Home Bakers
-          </p>
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl mt-2 tracking-tight">
-            Meet the bakers behind the magic.
+          <div className="flex items-center gap-3 mb-3">
+            <span className="h-px w-8 bg-[#b3874b]" />
+            <p className="text-[10px] sm:text-xs uppercase tracking-[0.28em] text-[#6b4a32] font-medium">
+              Curated Directory
+            </p>
+          </div>
+
+          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl tracking-tight leading-tight text-[#2b2118]">
+            Meet the bakers
+            <br className="hidden sm:block" /> behind the magic.
           </h2>
-          <p className="mt-3 text-base text-[#2b2118]/65 max-w-2xl leading-relaxed">
-            Discover verified independent home bakers across Mumbai, specializing in handcrafted
-            celebration cakes, French pastries, and artisanal confections.
+
+          <p className="mt-3.5 text-sm sm:text-base text-[#2b2118]/70 max-w-2xl leading-relaxed">
+            Discover Mumbai&apos;s independent home bakers, selected for their
+            craft, creativity, and exceptional desserts.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-wider text-[#2b2118]/50">
-            Showing <strong className="text-[#2b2118] font-semibold">{filtered.length}</strong> of{" "}
-            {allBakers.length} bakers
-          </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="rounded-full bg-white px-4 py-2 ring-1 ring-[#2b2118]/8 shadow-xs">
+            <span className="text-xs text-[#2b2118]/60">
+              Showing{" "}
+              <strong className="text-[#2b2118] font-semibold">
+                {filtered?.length ?? 0}
+              </strong>{" "}
+              of {allBakers?.length ?? 0} bakers
+            </span>
+          </div>
+
           {hasActiveFilters && (
             <button
               type="button"
               onClick={handleResetFilters}
-              className="text-xs text-[#6b4a32] underline hover:text-[#2b2118] font-medium"
+              className="text-xs font-medium text-[#6b4a32] hover:text-[#2b2118] underline underline-offset-4 transition cursor-pointer"
             >
               Reset filters
             </button>
@@ -140,103 +157,118 @@ export function BakerDiscovery({
         </div>
       </div>
 
-      {/* Interactive Search & Filter Controls */}
-      <div className="bg-[#faf6ef] rounded-[2rem] p-5 sm:p-7 shadow-[0_12px_40px_rgba(43,33,24,0.06)] ring-1 ring-[#2b2118]/8 mb-12 space-y-6">
-        {/* Main Search Bar */}
-        <div className="relative flex items-center bg-[#f6f1e8] rounded-full px-5 py-3 ring-1 ring-[#2b2118]/10 focus-within:ring-2 focus-within:ring-[#6b4a32]/50 transition-all">
-          <span className="text-lg mr-3 text-[#2b2118]/40">🔍</span>
+      {/* Concierge Search & Filter Console */}
+      <div className="bg-[#f4eee3]/70 rounded-[2rem] p-5 sm:p-7 shadow-[0_12px_36px_rgba(43,33,24,0.05)] ring-1 ring-[#2b2118]/8 mb-12">
+        {/* Search Input */}
+        <div className="flex items-center bg-white rounded-2xl sm:rounded-full px-4 sm:px-5 py-3.5 ring-1 ring-[#2b2118]/10 shadow-xs focus-within:ring-2 focus-within:ring-[#6b4a32]/30 transition-all">
+          <span className="text-base mr-3 text-[#6b4a32]/60 select-none">
+            🔍
+          </span>
+
           <input
             type="search"
-            value={filters.searchQuery}
+            value={filters?.searchQuery ?? ""}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by baker name, dessert, or try natural language like 'Chocolate cake in Bandra under ₹2000'..."
-            className="w-full bg-transparent text-sm sm:text-base outline-none placeholder:text-[#2b2118]/40"
+            placeholder="Search bakers, signature cakes, flavours, or try natural search..."
+            className="w-full bg-transparent text-sm sm:text-base outline-none text-[#2b2118] placeholder:text-[#2b2118]/40"
           />
-          {filters.searchQuery && (
+
+          {Boolean(filters?.searchQuery) && (
             <button
               type="button"
               onClick={() => handleSearchChange("")}
-              className="text-xs uppercase tracking-wider text-[#2b2118]/50 hover:text-[#2b2118] ml-2"
+              className="shrink-0 ml-2 rounded-full px-3 py-1 text-[11px] uppercase tracking-wider text-[#2b2118]/60 hover:bg-[#2b2118]/8 hover:text-[#2b2118] transition cursor-pointer"
             >
               Clear
             </button>
           )}
         </div>
 
-        {/* NLP Extraction Display Banner (Requirement 8) */}
+        {/* NLP Smart Search Detection Banner */}
         {nlpParsed && nlpParsed.confidence > 0.3 && (
-          <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-[#c4a574]/15 border border-[#c4a574]/30 text-xs text-[#2b2118]">
-            <span className="font-semibold text-[#6b4a32] flex items-center gap-1">
-              ✨ NLP Understood Query:
-            </span>
-            {nlpParsed.location && (
-              <span className="rounded-full bg-[#f6f1e8] px-2.5 py-1 text-[#2b2118] font-medium border border-[#2b2118]/10">
-                📍 Location: {nlpParsed.location}
+          <div className="mt-4 rounded-2xl bg-[#b3874b]/12 border border-[#b3874b]/30 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-[#6b4a32]">
+                ✨ Smart search
               </span>
-            )}
-            {nlpParsed.category && (
-              <span className="rounded-full bg-[#f6f1e8] px-2.5 py-1 text-[#2b2118] font-medium border border-[#2b2118]/10">
-                🍰 Category: {nlpParsed.category}
-              </span>
-            )}
-            {nlpParsed.maxBudget && (
-              <span className="rounded-full bg-[#f6f1e8] px-2.5 py-1 text-[#2b2118] font-medium border border-[#2b2118]/10">
-                🏷️ Max Budget: ₹{nlpParsed.maxBudget}
-              </span>
-            )}
-            {nlpParsed.dietaryPreferences.length > 0 && (
-              <span className="rounded-full bg-[#f6f1e8] px-2.5 py-1 text-[#2b2118] font-medium border border-[#2b2118]/10">
-                🌿 Dietary: {nlpParsed.dietaryPreferences.join(", ")}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => handleSearchChange("")}
-              className="ml-auto text-[11px] underline text-[#6b4a32] hover:text-[#2b2118]"
-            >
-              Clear NLP query
-            </button>
+
+              {nlpParsed.location && (
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] text-[#2b2118] ring-1 ring-[#2b2118]/8 shadow-xs">
+                  📍 {nlpParsed.location}
+                </span>
+              )}
+
+              {nlpParsed.category && (
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] text-[#2b2118] ring-1 ring-[#2b2118]/8 shadow-xs">
+                  🍰 {nlpParsed.category}
+                </span>
+              )}
+
+              {nlpParsed.maxBudget && (
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] text-[#2b2118] ring-1 ring-[#2b2118]/8 shadow-xs">
+                  ₹{nlpParsed.maxBudget} max
+                </span>
+              )}
+
+              {nlpParsed.dietaryPreferences.length > 0 && (
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] text-[#2b2118] ring-1 ring-[#2b2118]/8 shadow-xs">
+                  🌿 {nlpParsed.dietaryPreferences.join(", ")}
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                className="ml-auto text-[11px] font-medium text-[#6b4a32] hover:text-[#2b2118] underline underline-offset-4 cursor-pointer"
+              >
+                Reset query
+              </button>
+            </div>
           </div>
         )}
 
-        {/* NLP Sample Suggestion Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="shrink-0 text-[#2b2118]/45 font-medium">Try:</span>
+        {/* Sample NLP Prompts */}
+        <div className="mt-4.5 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <span className="shrink-0 text-xs text-[#2b2118]/45 font-medium mr-1">
+            Try:
+          </span>
+
           {SAMPLE_NLP_QUERIES.map((q) => (
             <button
               key={q}
               type="button"
               onClick={() => handleSearchChange(q)}
-              className="shrink-0 rounded-full bg-[#f6f1e8] px-3 py-1 text-[#2b2118]/70 border border-[#2b2118]/8 hover:border-[#6b4a32] hover:text-[#2b2118] transition-colors"
+              className="shrink-0 rounded-full bg-white/80 px-3.5 py-1.5 text-xs text-[#2b2118]/70 ring-1 ring-[#2b2118]/8 hover:ring-[#6b4a32]/40 hover:text-[#2b2118] hover:bg-white transition cursor-pointer shadow-xs"
             >
-              &ldquo;{q}&rdquo;
+              {q}
             </button>
           ))}
         </div>
 
-        {/* Category Horizontal Filter Pills */}
-        <div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+        {/* Category Horizontal Pills */}
+        <div className="mt-6 pt-5 border-t border-[#2b2118]/8">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
             <button
               type="button"
               onClick={() => handleCategoryChange("all")}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all ${
+              className={`shrink-0 rounded-full px-4 py-2 text-xs uppercase tracking-wider font-medium transition cursor-pointer shadow-xs ${
                 filters.selectedCategory === "all"
-                  ? "bg-[#2b2118] text-[#f6f1e8] shadow-sm"
-                  : "bg-[#f6f1e8] text-[#2b2118]/70 hover:bg-[#2b2118]/10"
+                  ? "bg-[#2b2118] text-[#faf7f2]"
+                  : "bg-white text-[#2b2118]/70 ring-1 ring-[#2b2118]/10 hover:bg-[#2b2118]/5 hover:text-[#2b2118]"
               }`}
             >
               All Categories
             </button>
+
             {categories.map((cat) => (
               <button
                 key={cat.name}
                 type="button"
                 onClick={() => handleCategoryChange(cat.name)}
-                className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all ${
+                className={`shrink-0 rounded-full px-4 py-2 text-xs uppercase tracking-wider font-medium transition cursor-pointer shadow-xs ${
                   filters.selectedCategory === cat.name
-                    ? "bg-[#2b2118] text-[#f6f1e8] shadow-sm"
-                    : "bg-[#f6f1e8] text-[#2b2118]/70 hover:bg-[#2b2118]/10"
+                    ? "bg-[#2b2118] text-[#faf7f2]"
+                    : "bg-white text-[#2b2118]/70 ring-1 ring-[#2b2118]/10 hover:bg-[#2b2118]/5 hover:text-[#2b2118]"
                 }`}
               >
                 {cat.name}
@@ -245,20 +277,20 @@ export function BakerDiscovery({
           </div>
         </div>
 
-        {/* Facet Filter Dropdowns */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-3 border-t border-[#2b2118]/8 text-xs">
-          {/* Mumbai Area Filter */}
+        {/* Dropdown Filters Grid */}
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[#2b2118]/50 font-medium mb-1">
+            <label className="block text-[10px] uppercase tracking-[0.2em] text-[#2b2118]/50 font-semibold mb-2">
               Mumbai Area
             </label>
+
             <select
               value={filters.selectedArea}
               onChange={(e) => handleAreaChange(e.target.value)}
-              className="w-full rounded-xl bg-[#f6f1e8] px-3 py-2.5 border border-[#2b2118]/10 outline-none text-[#2b2118]"
+              className="w-full rounded-xl bg-white px-3.5 py-3 border border-[#2b2118]/10 outline-none text-xs text-[#2b2118] font-medium shadow-xs focus:ring-2 focus:ring-[#6b4a32]/25 cursor-pointer"
             >
-              <option value="all">All Mumbai</option>
-              {areas
+              <option value="all">📍 All Mumbai</option>
+              {(areas || [])
                 .filter((a) => a !== "All Areas")
                 .map((area) => (
                   <option key={area} value={area}>
@@ -268,33 +300,33 @@ export function BakerDiscovery({
             </select>
           </div>
 
-          {/* Price Range Filter */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[#2b2118]/50 font-medium mb-1">
-              Budget / Price Tier
+            <label className="block text-[10px] uppercase tracking-[0.2em] text-[#2b2118]/50 font-semibold mb-2">
+              Price Range
             </label>
+
             <select
               value={filters.priceRange}
               onChange={(e) => handlePriceChange(e.target.value)}
-              className="w-full rounded-xl bg-[#f6f1e8] px-3 py-2.5 border border-[#2b2118]/10 outline-none text-[#2b2118]"
+              className="w-full rounded-xl bg-white px-3.5 py-3 border border-[#2b2118]/10 outline-none text-xs text-[#2b2118] font-medium shadow-xs focus:ring-2 focus:ring-[#6b4a32]/25 cursor-pointer"
             >
               <option value="all">All Prices</option>
               <option value="under-1000">Under ₹1,000</option>
               <option value="1000-2500">₹1,000 – ₹2,500</option>
               <option value="2500-5000">₹2,500 – ₹5,000</option>
-              <option value="above-5000">Luxury (₹5,000+)</option>
+              <option value="above-5000">Luxury ₹5,000+</option>
             </select>
           </div>
 
-          {/* Dietary Filter */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[#2b2118]/50 font-medium mb-1">
+            <label className="block text-[10px] uppercase tracking-[0.2em] text-[#2b2118]/50 font-semibold mb-2">
               Dietary Preference
             </label>
+
             <select
               value={filters.dietary}
               onChange={(e) => handleDietaryChange(e.target.value)}
-              className="w-full rounded-xl bg-[#f6f1e8] px-3 py-2.5 border border-[#2b2118]/10 outline-none text-[#2b2118]"
+              className="w-full rounded-xl bg-white px-3.5 py-3 border border-[#2b2118]/10 outline-none text-xs text-[#2b2118] font-medium shadow-xs focus:ring-2 focus:ring-[#6b4a32]/25 cursor-pointer"
             >
               <option value="all">All Kitchens</option>
               <option value="eggless">🌿 100% Eggless</option>
@@ -303,36 +335,41 @@ export function BakerDiscovery({
             </select>
           </div>
 
-          {/* Minimum Rating */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[#2b2118]/50 font-medium mb-1">
+            <label className="block text-[10px] uppercase tracking-[0.2em] text-[#2b2118]/50 font-semibold mb-2">
               Minimum Rating
             </label>
+
             <select
               value={filters.minRating}
               onChange={(e) => handleRatingChange(Number(e.target.value))}
-              className="w-full rounded-xl bg-[#f6f1e8] px-3 py-2.5 border border-[#2b2118]/10 outline-none text-[#2b2118]"
+              className="w-full rounded-xl bg-white px-3.5 py-3 border border-[#2b2118]/10 outline-none text-xs text-[#2b2118] font-medium shadow-xs focus:ring-2 focus:ring-[#6b4a32]/25 cursor-pointer"
             >
               <option value={0}>Any Rating</option>
               <option value={4.7}>★ 4.7 & above</option>
               <option value={4.8}>★ 4.8 & above</option>
-              <option value={4.9}>★ 4.9 & above (Elite)</option>
+              <option value={4.9}>★ 4.9+ Elite</option>
             </select>
           </div>
 
-          {/* Sort By */}
-          <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[#2b2118]/50 font-medium mb-1">
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-[10px] uppercase tracking-[0.2em] text-[#2b2118]/50 font-semibold mb-2">
               Sort By
             </label>
+
             <select
               value={filters.sortBy}
               onChange={(e) =>
                 handleSortChange(
-                  e.target.value as "featured" | "rating" | "reviews" | "price-asc" | "price-desc"
+                  e.target.value as
+                  | "featured"
+                  | "rating"
+                  | "reviews"
+                  | "price-asc"
+                  | "price-desc"
                 )
               }
-              className="w-full rounded-xl bg-[#f6f1e8] px-3 py-2.5 border border-[#2b2118]/10 outline-none text-[#2b2118]"
+              className="w-full rounded-xl bg-white px-3.5 py-3 border border-[#2b2118]/10 outline-none text-xs text-[#2b2118] font-medium shadow-xs focus:ring-2 focus:ring-[#6b4a32]/25 cursor-pointer"
             >
               <option value="featured">Featured Curations</option>
               <option value="rating">Highest Rated</option>
@@ -346,7 +383,7 @@ export function BakerDiscovery({
 
       {/* Bakers Grid */}
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-7">
           {filtered.map((baker) => (
             <BakerCard
               key={baker.id}
@@ -356,18 +393,24 @@ export function BakerDiscovery({
           ))}
         </div>
       ) : (
-        /* Empty State */
-        <div className="text-center py-16 px-4 bg-[#faf6ef] rounded-[2rem] border border-[#2b2118]/8">
-          <span className="text-4xl">🍰</span>
-          <h3 className="font-serif text-2xl mt-4">No bakers found matching your edit</h3>
-          <p className="text-sm text-[#2b2118]/65 mt-2 max-w-md mx-auto">
-            Try adjusting your search terms, clearing specific filters, or searching for other
-            neighbourhoods in Mumbai.
+        <div className="text-center py-20 px-6 bg-white rounded-[2rem] ring-1 ring-[#2b2118]/8 shadow-xs">
+          <div className="mx-auto w-16 h-16 rounded-full bg-[#f4eee3] flex items-center justify-center text-3xl">
+            🍰
+          </div>
+
+          <h3 className="font-serif text-2xl sm:text-3xl mt-5 text-[#2b2118]">
+            No bakers match your criteria.
+          </h3>
+
+          <p className="text-sm text-[#2b2118]/60 mt-2.5 max-w-md mx-auto leading-relaxed">
+            Try adjusting your search terms, neighbourhood selection, or price range
+            to explore more independent kitchens across Mumbai.
           </p>
+
           <button
             type="button"
             onClick={handleResetFilters}
-            className="mt-6 rounded-full bg-[#2b2118] px-6 py-2.5 text-xs uppercase tracking-wider font-medium text-[#f6f1e8] hover:bg-[#3a2c22] transition-colors"
+            className="mt-7 rounded-full bg-[#2b2118] px-7 py-3.5 text-xs uppercase tracking-wider font-medium text-[#faf7f2] hover:bg-[#3e2f23] transition cursor-pointer shadow-md"
           >
             Reset all filters
           </button>

@@ -4,14 +4,15 @@
 -- Includes Data Science, NLP & Sentiment Analysis structures
 -- ==========================================================
 
--- Enable extension for vector embeddings (if pgvector is enabled in Supabase)
--- CREATE EXTENSION IF NOT EXISTS vector;
+-- Enable extensions for fuzzy text search and vector embeddings
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- CREATE EXTENSION IF NOT EXISTS vector; -- Uncomment when pgvector is enabled in Supabase
 
 -- 1. LOCATIONS TABLE
 CREATE TABLE IF NOT EXISTS locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE, -- e.g. "Bandra West", "Juhu", "Colaba"
-  zone TEXT NOT NULL, -- "Western Suburbs", "South Mumbai", "Eastern Suburbs"
+  zone TEXT NOT NULL,        -- "Western Suburbs", "South Mumbai", "Eastern Suburbs"
   city TEXT NOT NULL DEFAULT 'Mumbai',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -45,8 +46,8 @@ CREATE TABLE IF NOT EXISTS bakers (
   price_range TEXT NOT NULL, -- e.g. "₹1,800 – ₹6,500"
   price_min INT NOT NULL DEFAULT 0,
   price_max INT NOT NULL DEFAULT 10000,
-  instagram TEXT NOT NULL, -- e.g. "https://instagram.com/aanya.bakes"
-  instagram_handle TEXT NOT NULL, -- e.g. "@aanya.bakes"
+  instagram TEXT NOT NULL,
+  instagram_handle TEXT NOT NULL,
   website TEXT,
   phone TEXT,
   lead_time TEXT DEFAULT '24-48 hours notice',
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS bakers (
   is_featured BOOLEAN DEFAULT false,
   
   -- Data Science & NLP Fields:
-  -- embedding vector(1536), -- Uncomment when pgvector is active
+  -- embedding vector(1536), -- Vector embeddings for semantic search
   features JSONB DEFAULT '{}'::jsonb, -- Stored feature vector for content-based recommendations
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -91,13 +92,33 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- INDEXES for fast discovery & search
+-- 6. BAKER APPLICATIONS TABLE (For home bakers applying to join)
+CREATE TABLE IF NOT EXISTS baker_applications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  brand_name TEXT NOT NULL,
+  instagram TEXT NOT NULL,
+  location TEXT NOT NULL,
+  specialty TEXT NOT NULL,
+  message TEXT,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'approved', 'declined')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- INDEXES for fast discovery, filtering & fuzzy search
 CREATE INDEX IF NOT EXISTS idx_bakers_area ON bakers(area);
+CREATE INDEX IF NOT EXISTS idx_bakers_location_id ON bakers(location_id);
 CREATE INDEX IF NOT EXISTS idx_bakers_rating ON bakers(rating DESC);
 CREATE INDEX IF NOT EXISTS idx_bakers_price_min ON bakers(price_min);
 CREATE INDEX IF NOT EXISTS idx_bakers_price_max ON bakers(price_max);
 CREATE INDEX IF NOT EXISTS idx_desserts_baker_id ON desserts(baker_id);
+CREATE INDEX IF NOT EXISTS idx_desserts_category_id ON desserts(category_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_baker_id ON reviews(baker_id);
+
+-- Trigram search indexes (PostgreSQL pg_trgm)
+CREATE INDEX IF NOT EXISTS idx_bakers_name_trgm ON bakers USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_bakers_specialties_trgm ON bakers USING gin (specialties gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_desserts_name_trgm ON desserts USING gin (name gin_trgm_ops);
 
 -- ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
@@ -105,6 +126,7 @@ ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bakers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE desserts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE baker_applications ENABLE ROW LEVEL SECURITY;
 
 -- Public read access policies
 CREATE POLICY "Allow public read access to locations" ON locations FOR SELECT USING (true);
@@ -113,14 +135,6 @@ CREATE POLICY "Allow public read access to bakers" ON bakers FOR SELECT USING (t
 CREATE POLICY "Allow public read access to desserts" ON desserts FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to reviews" ON reviews FOR SELECT USING (true);
 
--- Insert seed data for locations
-INSERT INTO locations (name, zone) VALUES
-  ('Bandra West', 'Western Suburbs'),
-  ('Juhu', 'Western Suburbs'),
-  ('Andheri West', 'Western Suburbs'),
-  ('Powai', 'Eastern Suburbs'),
-  ('Colaba', 'South Mumbai'),
-  ('Lower Parel', 'South Mumbai'),
-  ('Khar', 'Western Suburbs'),
-  ('Dadar', 'South Mumbai')
-ON CONFLICT (name) DO NOTHING;
+-- Public insert access policies (Applications & Reviews)
+CREATE POLICY "Allow public insert to baker_applications" ON baker_applications FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public insert to reviews" ON reviews FOR INSERT WITH CHECK (rating >= 1 AND rating <= 5);
